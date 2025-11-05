@@ -18,7 +18,7 @@ fn check_ip(config: &mut Args) -> Result<(), Box<dyn std::error::Error>> {
     let chosen: SocketAddr = collect.first().cloned().expect("No address collected");
     config.address = chosen;
 
-    return Ok({});
+    Ok(())
 }
 
 fn main() {
