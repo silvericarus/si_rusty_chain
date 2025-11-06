@@ -6,17 +6,39 @@ struct Args {
     host: String,
     port: u16,
     mode: String,
-    address: SocketAddr,
+    final_host: SocketAddr,
 }
 
 fn check_ip(config: &mut Args) -> Result<(), Box<dyn std::error::Error>> {
-    let ip = config
-        .host
-        .parse::<IpAddr>()
-        .expect("Error parsing address");
-    let collect: Vec<SocketAddr> = (ip, config.port).to_socket_addrs()?.collect();
-    let chosen: SocketAddr = collect.first().cloned().expect("No address collected");
-    config.address = chosen;
+    let ip = config.host.parse::<IpAddr>().ok();
+    if ip.is_some() {
+        let collect: Vec<SocketAddr> = (ip.ok_or("Invalid Address")?, config.port)
+            .to_socket_addrs()?
+            .collect();
+        let addr = collect
+            .iter()
+            .find(|a| a.is_ipv4())
+            .copied()
+            .unwrap_or(collect[0]);
+        config.final_host = addr;
+    } else {
+        match (config.host.as_str(), config.port).to_socket_addrs() {
+            Ok(it) => {
+                let collect: Vec<SocketAddr> = it.collect();
+
+                let addr = collect
+                    .iter()
+                    .find(|a| a.is_ipv4())
+                    .copied()
+                    .unwrap_or(collect[0]);
+                config.final_host = addr;
+            }
+            Err(_e) => {
+                eprintln!("Error. Unknown host.");
+                process::exit(1);
+            }
+        }
+    }
 
     Ok(())
 }
@@ -36,7 +58,7 @@ fn main() {
             host: String::from(&args[2]),
             port: args[4].parse().expect("Error parsing."),
             mode: String::from(&args[6]),
-            address: SocketAddr::new([127, 0, 0, 1].into(), 80),
+            final_host: SocketAddr::new([127, 0, 0, 1].into(), 80),
         };
 
         if config.port <= 1024 || args[3] != "--port" {
@@ -50,7 +72,7 @@ fn main() {
             process::exit(1);
         }
         let _ = check_ip(&mut config);
-        println!("Host: {}", config.address);
+        println!("Host: {}", config.final_host);
         println!("Mode: {}", config.mode);
         process::exit(0);
     } else {
