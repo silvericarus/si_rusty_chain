@@ -1,10 +1,15 @@
+mod wal;
 use flexi_logger::Logger;
 use log::{debug, error, info, warn};
+use core::error;
 use std::env;
 use std::error::Error;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::path::Path;
 use std::process;
 use std::time::Instant;
+
+use crate::wal::{ensure_wal_dir, open_init_current};
 
 struct Args {
     host: String,
@@ -94,23 +99,24 @@ fn check_ip(config: &mut Args) -> Result<(), Box<dyn std::error::Error>> {
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 7 && args.len() != 2 {
+    if args.len() < 7 && args.len() != 2 {
         eprintln!("Not enough arguments provided.");
         eprintln!("./si_rusty_chain --host <host> --port <port> --mode <mode>");
         process::exit(1);
     } else if args.len() == 2 && (args[1] == "--help" || args[1] == "-h") {
         println!("./si_rusty_chain --host <host> --port <port> --mode <mode>");
         process::exit(0);
-    } else if args.len() == 7 {
+    } else if args.len() == 7 || args.len() == 8 {
         let mut config = Args {
             host: String::from(&args[2]),
             port: args[4].parse().expect("Error parsing."),
             mode: String::from(&args[6]),
             final_host: SocketAddr::new([127, 0, 0, 1].into(), 80),
         };
-        let _ = init_logging();
+        let rotate_now: bool = std::env::args().any(|a| a == "--rotate-now");
 
-        let t0 = Instant::now();
+        let _ = init_logging();
+        let t0: Instant = Instant::now();
         info!(
             "start app=si_rusty_chain version={} mode={} host={} port={}",
             env!("CARGO_PKG_VERSION"),
@@ -118,6 +124,20 @@ fn main() {
             config.host,
             config.port
         );
+        let wal_dir: &Path = Path::new("data/wal");
+		let _ = ensure_wal_dir(wal_dir).map_err(|e| {
+			 error!("wal_open: dir couldn't be created {:?}: {}", wal_dir, e);
+    	});
+
+		let current_path: std::path::PathBuf = wal_dir.join("current.wal");
+		let mut wal_file = open_init_current(&current_path).map_err(|e| {
+			error!("wal_open: failed to open {:?}: {}", current_path, e);
+		});
+
+		//TODO: Cambiar a unwrap seguro linea 133 y 138
+		let cur_size = wal_file.unwrap().metadata()?.len();
+		info!("wal_open path={:?} size={}B", current_path, cur_size);
+
         warn!("'demo' mode is only a testing temporary solution. Expect it to change.");
 
         if config.port <= 1024 || args[3] != "--port" {
