@@ -1,7 +1,6 @@
 mod wal;
 use flexi_logger::Logger;
 use log::{debug, error, info, warn};
-use core::error;
 use std::env;
 use std::error::Error;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
@@ -125,19 +124,31 @@ fn main() {
             config.port
         );
         let wal_dir: &Path = Path::new("data/wal");
-		let _ = ensure_wal_dir(wal_dir).map_err(|e| {
-			 error!("wal_open: dir couldn't be created {:?}: {}", wal_dir, e);
-    	});
+        let _ = ensure_wal_dir(wal_dir).map_err(|e| {
+            error!("wal_open: dir couldn't be created {:?}: {}", wal_dir, e);
+        });
 
-		let current_path: std::path::PathBuf = wal_dir.join("current.wal");
-		let mut wal_file = open_init_current(&current_path).map_err(|e| {
-			error!("wal_open: failed to open {:?}: {}", current_path, e);
-		});
+        let current_path: std::path::PathBuf = wal_dir.join("current.wal");
+        let wal_file = match open_init_current(&current_path) {
+            Ok(f) => f,
+            Err(e) => {
+                error!("wal_open: failed to open {:?}: {}", current_path, e);
+                std::process::exit(1);
+            }
+        };
 
-		//TODO: Cambiar a unwrap seguro linea 133 y 138
-		let cur_size = wal_file.unwrap().metadata()?.len();
-		info!("wal_open path={:?} size={}B", current_path, cur_size);
+        let cur_size = match wal_file.metadata() {
+            Ok(md) => md.len(),
+            Err(e) => {
+                error!("metadata() failed: {e}");
+                std::process::exit(1);
+            }
+        };
+        info!("wal_open path={:?} size={}B", current_path, cur_size);
 
+		if rotate_now {
+			let _ = wal::rotate_wal(&wal_dir);
+		}
         warn!("'demo' mode is only a testing temporary solution. Expect it to change.");
 
         if config.port <= 1024 || args[3] != "--port" {
