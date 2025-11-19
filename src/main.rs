@@ -146,9 +146,9 @@ fn main() {
         };
         info!("wal_open path={:?} size={}B", current_path, cur_size);
 
-		if rotate_now {
-			let _ = wal::rotate_wal(wal_dir);
-		}
+        if rotate_now {
+            let _ = wal::rotate_wal(wal_dir);
+        }
         warn!("'demo' mode is only a testing temporary solution. Expect it to change.");
 
         if config.port <= 1024 || args[3] != "--port" {

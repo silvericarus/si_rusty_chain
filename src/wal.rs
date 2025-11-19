@@ -21,17 +21,17 @@ pub fn open_init_current(path: &Path) -> io::Result<File> {
         .append(true)
         .open(path)?;
 
-	let mut size: u64 = f.metadata()?.len();
-	let header_len: u64 = (MAGIC.len() + 2) as u64;
-	
+    let mut size: u64 = f.metadata()?.len();
+    let header_len: u64 = (MAGIC.len() + 2) as u64;
+
     if size == 0 {
-		f.write_all(super::wal::MAGIC)?;
+        f.write_all(super::wal::MAGIC)?;
         f.write_all(&super::wal::VERSION.to_le_bytes())?;
         f.sync_all()?;
     }
 
-	size = f.metadata()?.len();
-	
+    size = f.metadata()?.len();
+
     if size < header_len {
         error!("wal header truncated: size={}B (< {}B)", size, header_len);
         std::process::exit(1);
@@ -46,13 +46,13 @@ pub fn open_init_current(path: &Path) -> io::Result<File> {
         std::process::exit(1);
     }
 
-	let mut ver: [u8; 2] = [0u8; 2];
-	f.read_exact(&mut ver)?;
-	let v: u16 = u16::from_le_bytes(ver);
-	if v != VERSION {
-		error!("version mismatch: expected {:?}, got {:?}", VERSION, v);
+    let mut ver: [u8; 2] = [0u8; 2];
+    f.read_exact(&mut ver)?;
+    let v: u16 = u16::from_le_bytes(ver);
+    if v != VERSION {
+        error!("version mismatch: expected {:?}, got {:?}", VERSION, v);
         std::process::exit(1);
-	}
+    }
 
     Ok(f)
 }
